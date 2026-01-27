@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, render_template, request, redirect, url_for
 from psycopg2 import OperationalError
 from datetime import date
@@ -82,7 +84,7 @@ def create_app() -> Flask:
             return render_template("error.html", title="Changement impossible", message=str(e)), 409
         except Exception as e:
             return render_template("error.html", title="Erreur", message=str(e)), 500
-    
+
 
     # =========================
     # UI : Supprimer article
@@ -171,4 +173,6 @@ def create_app() -> Flask:
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(debug=True, host="localhost", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host="0.0.0.0", port=port)
+

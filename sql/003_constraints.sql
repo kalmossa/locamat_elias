@@ -71,3 +71,4 @@ BEFORE UPDATE OF statut ON articles
 FOR EACH ROW
 EXECUTE FUNCTION fn_articles_location_guard();
 
+COMMIT;
