@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <h1>{{ title }}</h1>
+
+      <nav class="nav">
+        <a class="btn" href="{{ url_for('home') }}">Accueil</a>
+        <a class="btn" href="{{ url_for('articles_ui') }}">Articles</a>
+        <a class="btn" href="{{ url_for('contrats_ui') }}">Louer</a>
+        <a class="btn" href="{{ url_for('retours_ui') }}">Rendre un article</a>
+
+        <!-- debug optionnel -->
+        <!-- <a class="btn btn-ghost" href="{{ url_for('health') }}">Health (JSON)</a>
+        <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Dashboard (JSON)</a> -->
+      </nav>
+    </header>
+
+    <section class="card">
+      <h2>Indicateurs en temps réel</h2>
+
+      <div class="grid">
+        <div class="kpi">
+          <div class="kpi-title">CA sur les 30 derniers jours</div>
+          <div class="kpi-value">{{ dash.ca_30j }} €</div>
+        </div>
+
+        <div class="panel">
+          <h3>Top 5 matériels les plus rentables du mois</h3>
+          <ul>
+            {% for a in dash.top5 %}
+              <li>#{{ a.id_article }} — {{ a.marque }} {{ a.modele }} ({{ a.numero_serie }}) : {{ a.revenu_mois }} €</li>
+            {% else %}
+              <li>Aucun résultat.</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <div class="panel">
+          <h3>Alertes retards</h3>
+          <ul>
+            {% for al in dash.alertes_retards %}
+              <li>
+                Contrat #{{ al.id_contrat }} (retour prévu {{ al.date_fin_prevue }}) —
+                {{ al.client_prenom }} {{ al.client_nom }} —
+                Article #{{ al.id_article }} ({{ al.marque }} {{ al.modele }} / {{ al.numero_serie }})
+              </li>
+            {% else %}
+              <li>Aucune alerte.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

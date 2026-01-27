@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <h1>{{ title }}</h1>
+      <nav class="nav">
+        <a class="btn" href="{{ url_for('home') }}">Dashboard</a>
+        <a class="btn" href="{{ url_for('contrats_ui') }}">Louer</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      <form method="post" class="form">
+        <label>Nom
+          <input name="nom" type="text" required>
+        </label>
+
+        <label>Prénom
+          <input name="prenom" type="text" required>
+        </label>
+
+        <label style="display:flex; gap:10px; align-items:center;">
+          <input name="est_vip" type="checkbox">
+          VIP
+        </label>
+
+        <button class="btn primary" type="submit">Créer le client</button>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

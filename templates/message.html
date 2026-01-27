@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <h1>{{ title }}</h1>
+      <nav class="nav">
+        <a class="btn" href="{{ url_for('home') }}">Dashboard</a>
+        <a class="btn" href="{{ url_for('articles_ui') }}">Articles</a>
+        <a class="btn" href="{{ url_for('contrats_ui') }}">Louer</a>
+        <a class="btn" href="{{ url_for('retours_ui') }}">Retour</a>
+      </nav>
+    </header>
+
+    <section class="card">
+
+      {# ===== CAS 1 : Contrat validé ===== #}
+      {% if payload and payload.prix_final is defined %}
+
+        <h2>Contrat validé</h2>
+        <p><strong>ID contrat :</strong> {{ payload.id_contrat }}</p>
+
+        <div class="kpi">
+          <div class="kpi-title">Prix final</div>
+          <div class="kpi-value">{{ payload.prix_final }} €</div>
+        </div>
+
+        {% if payload.nb_jours is defined %}
+          <hr>
+          <ul>
+            <li>Durée : {{ payload.nb_jours }} jours</li>
+            {% if payload.prix_base is defined %}
+              <li>Prix de base : {{ payload.prix_base }} €</li>
+            {% endif %}
+
+            {% if payload.remise_duree_pct is defined and payload.remise_duree_pct > 0 %}
+              <li>Remise durée : −{{ payload.remise_duree_pct }} %</li>
+            {% endif %}
+            {% if payload.remise_vip_pct is defined and payload.remise_vip_pct > 0 %}
+              <li>Remise VIP : −{{ payload.remise_vip_pct }} %</li>
+            {% endif %}
+            {% if payload.surcharge_retard_pct is defined and payload.surcharge_retard_pct > 0 %}
+              <li>Surcharge retard : +{{ payload.surcharge_retard_pct }} %</li>
+            {% endif %}
+          </ul>
+        {% endif %}
+
+        {% if payload.lignes is defined %}
+          <h3>Détail par article</h3>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID article</th>
+                <th>Prix/j</th>
+                <th>Jours</th>
+                <th>Remise durée</th>
+                <th>Remise VIP</th>
+                <th>Surcharge retard</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for l in payload.lignes %}
+                <tr>
+                  <td>{{ l.id_article }}</td>
+                  <td>{{ l.prix_journalier_applique }}</td>
+                  <td>{{ l.nombre_jours }}</td>
+                  <td>-{{ l.remise_duree_pct }}%</td>
+                  <td>-{{ l.remise_vip_pct }}%</td>
+                  <td>+{{ l.surcharge_retard_pct }}%</td>
+                  <td><strong>{{ l.prix_total_ligne }}</strong></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+
+      {# ===== CAS 2 : Retour enregistré ===== #}
+      {% else %}
+
+        <h2>Retour enregistré</h2>
+        <ul>
+          {% if payload.id_ligne is defined %}<li><strong>ID ligne :</strong> {{ payload.id_ligne }}</li>{% endif %}
+          {% if payload.id_contrat is defined %}<li><strong>ID contrat :</strong> {{ payload.id_contrat }}</li>{% endif %}
+          {% if payload.id_article is defined %}<li><strong>ID article :</strong> {{ payload.id_article }}</li>{% endif %}
+          {% if payload.date_retour_effective is defined %}<li><strong>Date retour :</strong> {{ payload.date_retour_effective }}</li>{% endif %}
+          {% if payload.etat_retour is defined %}<li><strong>État :</strong> {{ payload.etat_retour }}</li>{% endif %}
+        </ul>
+
+      {% endif %}
+
+      <div style="height:14px"></div>
+      <details>
+        <summary>Voir le JSON</summary>
+        <pre class="pre">{{ payload | tojson(indent=2) }}</pre>
+      </details>
+
+    </section>
+  </div>
+</body>
+</html>

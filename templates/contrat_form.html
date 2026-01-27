@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="topbar">
+      <h1>{{ title }}</h1>
+      <nav class="nav">
+        <a class="btn" href="{{ url_for('home') }}">Dashboard</a>
+        <a class="btn" href="{{ url_for('articles_ui') }}">Articles</a>
+      </nav>
+    </header>
+
+    <section class="card">
+      {% if error %}
+        <div class="error">{{ error }}</div>
+        <div style="height:10px"></div>
+      {% endif %}
+
+      <form method="post" class="form">
+        <label>Client</label>
+        <select name="id_client" id="id_client" required>
+          <option value="" disabled selected>— Choisir un client —</option>
+          {% for c in clients %}
+            <option value="{{ c.id_client }}">
+              #{{ c.id_client }} — {{ c.prenom }} {{ c.nom }}{% if c.est_vip %} (VIP){% endif %}
+            </option>
+          {% endfor %}
+          <option value="__NEW__">➕ Nouveau client</option>
+        </select>
+
+        <div id="new_client_fields" style="display:none; margin-top:10px;">
+          <label>Nom
+            <input name="new_nom" type="text" placeholder="Nom">
+          </label>
+
+          <label>Prénom
+            <input name="new_prenom" type="text" placeholder="Prénom">
+          </label>
+
+          <label style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+            <input name="new_est_vip" type="checkbox">
+            VIP
+          </label>
+        </div>
+
+        <label>Date début
+          <input name="date_debut" type="date" required>
+        </label>
+
+        <label>Date fin prévue
+          <input name="date_fin_prevue" type="date" required>
+        </label>
+
+        <div style="margin-top:10px;">
+          <strong>Articles disponibles</strong>
+          <div class="muted" style="margin-top:6px;">Coche un ou plusieurs articles.</div>
+
+          {% if not articles_dispo %}
+            <p>Aucun article disponible.</p>
+          {% else %}
+            <div style="margin-top:8px; display:grid; gap:8px;">
+              {% for a in articles_dispo %}
+                <label style="display:flex; gap:10px; align-items:center;">
+                  <input type="checkbox" name="article_ids" value="{{ a.id_article }}">
+                  <span>
+                    #{{ a.id_article }} — {{ a.marque }} {{ a.modele }} ({{ a.numero_serie }}) — {{ a.prix_journalier_actuel }} €/j
+                  </span>
+                </label>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" type="submit">Valider le contrat</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    const sel = document.getElementById("id_client");
+    const box = document.getElementById("new_client_fields");
+
+    function toggleNew() {
+      const isNew = sel.value === "__NEW__";
+      box.style.display = isNew ? "block" : "none";
+      // on rend required seulement si nouveau
+      const nom = document.querySelector('input[name="new_nom"]');
+      const prenom = document.querySelector('input[name="new_prenom"]');
+      if (nom && prenom) {
+        nom.required = isNew;
+        prenom.required = isNew;
+      }
+    }
+    sel.addEventListener("change", toggleNew);
+    toggleNew();
+  </script>
+</body>
+</html>
