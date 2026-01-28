@@ -1,10 +1,8 @@
 -- =========================================================
 -- LOCA-MAT - schema.sql (PostgreSQL)
--- Tables + contraintes + index (version MLD)
+-- Tables + contraintes + index
 -- =========================================================
 
--- Optionnel (propre) : tout supprimer pour rejouer le script
--- ATTENTION: en dev uniquement
 DROP TABLE IF EXISTS retours CASCADE;
 DROP TABLE IF EXISTS lignes_contrat CASCADE;
 DROP TABLE IF EXISTS contrats_location CASCADE;
@@ -71,7 +69,7 @@ CREATE TABLE articles (
 );
 
 -- =========================================================
--- 3) CONTRATS + LIGNES (COEUR METIER)
+-- 3) CONTRATS + LIGNES
 -- =========================================================
 
 CREATE TABLE contrats_location (
@@ -115,9 +113,9 @@ CREATE TABLE lignes_contrat (
 
     prix_total_ligne NUMERIC(12,2) NOT NULL,
 
-    -- IMPORTANT: utilisé dans tes DAL
+    -- retour géré ici (source de vérité)
     etat_retour VARCHAR(20) NOT NULL DEFAULT 'NonRetourne',
-    date_retour_effective DATE NULL,
+    date_retour_effective DATE,
 
     CONSTRAINT fk_ligne_contrat
         FOREIGN KEY (id_contrat) REFERENCES contrats_location(id_contrat)
@@ -129,9 +127,6 @@ CREATE TABLE lignes_contrat (
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    CONSTRAINT ck_lignes_etat_retour
-        CHECK (etat_retour IN ('NonRetourne','Retourne')),
-
     CONSTRAINT uq_ligne_unique_article_par_contrat
         UNIQUE (id_contrat, id_article),
 
@@ -142,18 +137,21 @@ CREATE TABLE lignes_contrat (
         CHECK (prix_journalier_applique >= 0 AND prix_total_ligne >= 0),
 
     CONSTRAINT ck_ligne_pourcentages
-        CHECK (
-            remise_duree_pct >= 0 AND remise_vip_pct >= 0 AND surcharge_retard_pct >= 0
-        )
+        CHECK (remise_duree_pct >= 0 AND remise_vip_pct >= 0 AND surcharge_retard_pct >= 0),
+
+    CONSTRAINT ck_lignes_etat_retour
+        CHECK (etat_retour IN ('NonRetourne','Retourne'))
 );
 
 -- =========================================================
--- 4) RETOURS (optionnel: table historique séparée)
+-- 4) RETOURS (optionnel: historique séparé)
+-- Tu peux le garder, mais ton code n'en dépend pas.
 -- =========================================================
 
 CREATE TABLE retours (
     id_retour SERIAL PRIMARY KEY,
     id_ligne INT NOT NULL UNIQUE,
+
     date_retour_effective DATE NOT NULL,
     etat_retour VARCHAR(20) NOT NULL DEFAULT 'Retourne',
     commentaire VARCHAR(255),
@@ -168,7 +166,7 @@ CREATE TABLE retours (
 );
 
 -- =========================================================
--- 5) INDEX UTILES
+-- 5) INDEX
 -- =========================================================
 
 CREATE INDEX idx_contrats_date_fin_prevue ON contrats_location(date_fin_prevue);

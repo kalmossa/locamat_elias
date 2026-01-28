@@ -14,15 +14,12 @@ class RetoursDAL:
 
             with conn.cursor() as cur:
                 # 1) Lock ligne + récup infos
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT id_article, id_contrat, etat_retour
                     FROM lignes_contrat
                     WHERE id_ligne = %s
                     FOR UPDATE;
-                    """,
-                    (id_ligne,),
-                )
+                """, (id_ligne,))
                 row = cur.fetchone()
                 if not row:
                     conn.rollback()
@@ -30,35 +27,30 @@ class RetoursDAL:
 
                 id_article, id_contrat, etat_actuel = row
 
-                # 2) Refus si déjà traité
+                # 2) Refus si déjà retourné
                 if etat_actuel != "NonRetourne":
                     conn.rollback()
                     return False, f"Retour déjà traité (etat_retour={etat_actuel})."
 
-                # 3) MAJ ligne : retour
-                cur.execute(
-                    """
+                # 3) MAJ ligne (le retour vit dans lignes_contrat)
+                cur.execute("""
                     UPDATE lignes_contrat
                     SET date_retour_effective = %s,
                         etat_retour = %s
                     WHERE id_ligne = %s;
-                    """,
-                    (date_retour, etat_retour, id_ligne),
-                )
+                """, (date_retour, etat_retour, id_ligne))
+
                 if cur.rowcount != 1:
                     conn.rollback()
                     return False, "Échec mise à jour ligne de contrat."
 
-                # 4) Lock article + contrôle statut
-                cur.execute(
-                    """
+                # 4) Lock article + remise en stock si possible
+                cur.execute("""
                     SELECT statut
                     FROM articles
                     WHERE id_article = %s
                     FOR UPDATE;
-                    """,
-                    (id_article,),
-                )
+                """, (id_article,))
                 row_statut = cur.fetchone()
                 if not row_statut:
                     conn.rollback()
@@ -66,38 +58,29 @@ class RetoursDAL:
 
                 statut_article = row_statut[0]
 
-                # Si article en maintenance/rebut, on ne force pas Disponible
+                # Si l'article est EnMaintenance/Rebut, on ne force pas Disponible
                 if statut_article not in ("EnMaintenance", "Rebut"):
-                    cur.execute(
-                        """
+                    cur.execute("""
                         UPDATE articles
                         SET statut = 'Disponible'
                         WHERE id_article = %s;
-                        """,
-                        (id_article,),
-                    )
+                    """, (id_article,))
 
-                # 5) Si plus aucune ligne NonRetourne sur le contrat => Cloture
-                cur.execute(
-                    """
+                # 5) Si plus aucune ligne NonRetourne sur ce contrat => clôture
+                cur.execute("""
                     SELECT 1
                     FROM lignes_contrat
                     WHERE id_contrat = %s
                       AND etat_retour = 'NonRetourne'
                     LIMIT 1;
-                    """,
-                    (id_contrat,),
-                )
+                """, (id_contrat,))
                 if cur.fetchone() is None:
-                    cur.execute(
-                        """
+                    cur.execute("""
                         UPDATE contrats_location
                         SET statut = 'Cloture'
                         WHERE id_contrat = %s
                           AND statut <> 'Cloture';
-                        """,
-                        (id_contrat,),
-                    )
+                    """, (id_contrat,))
 
             conn.commit()
             return True, {
@@ -122,8 +105,7 @@ class RetoursDAL:
 
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT
                         lc.id_ligne,
                         lc.id_contrat,
@@ -139,8 +121,7 @@ class RetoursDAL:
                     WHERE lc.etat_retour = 'NonRetourne'
                       AND c.statut = 'Valide'
                     ORDER BY c.date_fin_prevue ASC, lc.id_ligne ASC;
-                    """
-                )
+                """)
                 rows = cur.fetchall()
 
             return [

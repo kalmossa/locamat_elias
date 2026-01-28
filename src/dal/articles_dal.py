@@ -8,9 +8,11 @@ class ArticlesDAL:
 
     def get_all_with_location(self) -> list[dict]:
         """
-        Retourne tous les articles + (si applicable) l'info de location en cours :
-        - id_ligne et date_fin_prevue uniquement si un contrat 'Valide' existe
-          ET que cette ligne n'a pas encore de retour enregistré dans la table retours.
+        Retourne tous les articles + infos de location en cours (si existe).
+        Une location en cours = une ligne_contrat avec etat_retour='NonRetourne'
+        sur un contrat_location statut='Valide'.
+
+        Important: on ne renvoie qu'UNE seule ligne active par article (pas de doublons).
         """
         conn = get_connection()
         if not conn:
@@ -27,27 +29,25 @@ class ArticlesDAL:
                         a.numero_serie,
                         a.prix_journalier_actuel,
                         a.statut,
-                        c.date_fin_prevue,
-                        lc.id_ligne
+                        active.date_fin_prevue,
+                        active.id_ligne
                     FROM articles a
                     JOIN marques m ON m.id_marque = a.id_marque
                     JOIN categories cat ON cat.id_categorie = a.id_categorie
 
-                    -- lignes de contrat liées à l'article
-                    LEFT JOIN lignes_contrat lc
-                      ON lc.id_article = a.id_article
-
-                    -- contrat valide
-                    LEFT JOIN contrats_location c
-                      ON c.id_contrat = lc.id_contrat
-                     AND c.statut = 'Valide'
-
-                    -- si un retour existe pour la ligne, ce n'est plus "en cours"
-                    LEFT JOIN retours r
-                      ON r.id_ligne = lc.id_ligne
-
-                    -- on ne garde l'info location que si contrat valide ET pas de retour
-                    WHERE (c.id_contrat IS NULL OR r.id_retour IS NULL)
+                    -- récupère au plus une location ACTIVE par article
+                    LEFT JOIN LATERAL (
+                        SELECT
+                            lc.id_ligne,
+                            c.date_fin_prevue
+                        FROM lignes_contrat lc
+                        JOIN contrats_location c ON c.id_contrat = lc.id_contrat
+                        WHERE lc.id_article = a.id_article
+                          AND lc.etat_retour = 'NonRetourne'
+                          AND c.statut = 'Valide'
+                        ORDER BY lc.id_ligne DESC
+                        LIMIT 1
+                    ) active ON TRUE
 
                     ORDER BY a.id_article;
                 """)
@@ -181,101 +181,28 @@ class ArticlesDAL:
             conn.autocommit = False
             with conn.cursor() as cur:
                 # lock article
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT statut
                     FROM articles
                     WHERE id_article = %s
                     FOR UPDATE;
-                    """,
-                    (id_article,),
-                )
+                """, (id_article,))
                 row = cur.fetchone()
                 if not row:
                     conn.rollback()
                     return False, "Article introuvable."
 
-                statut_actuel = row[0]
-
-                                # Refuse tout changement de statut si une location est en cours
-                cur.execute(
-                    """
+                # Interdire toute modif manuelle si location en cours (etat_retour=NonRetourne)
+                cur.execute("""
                     SELECT 1
                     FROM lignes_contrat
                     WHERE id_article = %s
                       AND etat_retour = 'NonRetourne'
                     LIMIT 1;
-                    """,
-                    (id_article,),
-                )
-                if cur.fetchone() and new_statut != "Loue":
-                    conn.rollback()
-                    return False, "Impossible : article actuellement loué."
-                
-                
-                                # Règle : interdit de passer EnMaintenance/Rebut si l'article est loué
-                if statut_actuel == "Loue" and new_statut in {"EnMaintenance", "Rebut"}:
-                    conn.rollback()
-                    return False, "Impossible : l'article est actuellement loué."
-
-                # Règle : interdit de repasser Disponible si une location non retournée existe
-                if new_statut == "Disponible":
-                    cur.execute(
-                        """
-                        SELECT 1
-                        FROM lignes_contrat lc
-                        JOIN contrats_location c ON c.id_contrat = lc.id_contrat
-                        LEFT JOIN retours r ON r.id_ligne = lc.id_ligne
-                        WHERE lc.id_article = %s
-                          AND c.statut = 'Valide'
-                          AND r.id_retour IS NULL
-                        LIMIT 1;
-                        """,
-                        (id_article,),
-                    )
-                    if cur.fetchone():
-                        conn.rollback()
-                        return False, "Impossible : une location en cours existe pour cet article."
-
-                cur.execute(
-                    """
-                    UPDATE articles
-                    SET statut = %s
-                    WHERE id_article = %s;
-                    """,
-                    (new_statut, id_article),
-                )
-
-            conn.commit()
-            return True, "Statut mis à jour."
-        except Exception as e:
-            conn.rollback()
-            log_critical_error("DAL Articles update_statut", e)
-            return False, "Erreur technique lors de la mise à jour du statut."
-        finally:
-            conn.close()
-
-    def update_statut_if_allowed(self, id_article: int, new_statut: str):
-        conn = get_connection()
-        if not conn:
-            return False, "Connexion DB impossible"
-
-        try:
-            with conn.cursor() as cur:
-                # Refuse si location en cours (contrat valide + pas de retour)
-                cur.execute("""
-                    SELECT 1
-                    FROM lignes_contrat lc
-                    JOIN contrats_location c ON c.id_contrat = lc.id_contrat
-                    LEFT JOIN retours r ON r.id_ligne = lc.id_ligne
-                    WHERE lc.id_article = %s
-                      AND c.statut = 'Valide'
-                      AND r.id_retour IS NULL
-                    LIMIT 1;
                 """, (id_article,))
                 if cur.fetchone():
                     conn.rollback()
-                    return False, "Changement interdit : location en cours pour cet article."
+                    return False, "Impossible : article actuellement loué."
 
                 cur.execute("""
                     UPDATE articles
@@ -283,15 +210,12 @@ class ArticlesDAL:
                     WHERE id_article = %s;
                 """, (new_statut, id_article))
 
-                if cur.rowcount != 1:
-                    conn.rollback()
-                    return False, "Article introuvable."
-
             conn.commit()
             return True, "Statut mis à jour."
+
         except Exception as e:
             conn.rollback()
-            log_critical_error("DAL Articles update_statut_if_allowed", e)
+            log_critical_error("DAL Articles update_statut", e)
             return False, "Erreur technique lors de la mise à jour du statut."
         finally:
             conn.close()
