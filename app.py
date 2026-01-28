@@ -39,10 +39,15 @@ def create_app() -> Flask:
         conn = None
         try:
             conn = get_connection()
+            if conn is None:
+                return {"status": "ok", "db": "error", "detail": "No connection"}, 503
+    
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
                 cur.fetchone()
+    
             return {"status": "ok", "db": "ok"}
+    
         except OperationalError as e:
             return {"status": "ok", "db": "error", "detail": str(e)}, 503
         except Exception as e:
