@@ -64,28 +64,16 @@ class LocamatService:
     def changer_statut_article(self, id_article: int, new_statut: str):
         if id_article <= 0:
             raise ValueError("id_article invalide.")
-        ok, result = self.articles_dal.update_statut(id_article, new_statut)
-        if not ok:
-            raise RuntimeError(result)
-        return result
-    
-    def changer_statut_article(self, id_article: int, new_statut: str):
-        if id_article <= 0:
-            raise ValueError("id_article invalide.")
-    
+
         new_statut = (new_statut or "").strip()
-    
-        # normalisation minimale
-        allowed = {"Disponible", "Loue", "Maintenance", "Rebut"}
+        allowed = {"Disponible", "Loue", "EnMaintenance", "Rebut"}
         if new_statut not in allowed:
             raise ValueError("Statut invalide.")
-    
-        ok, msg = self.articles_dal.update_statut_if_allowed(id_article, new_statut)
+
+        ok, msg = self.articles_dal.update_statut(id_article, new_statut)
         if not ok:
             raise RuntimeError(msg)
         return msg
-
-
 
     # -------------------
     # Dashboard
@@ -100,7 +88,6 @@ class LocamatService:
     # Retours
     # -------------------
     def lister_retours_possibles(self):
-        # nécessite RetoursDAL.get_non_retournes()
         return self.retours_dal.get_non_retournes()
 
     def enregistrer_retour(self, id_ligne: int, date_retour: date):
@@ -115,16 +102,7 @@ class LocamatService:
     # -------------------
     # Contrats / Location
     # -------------------
-    
-    
-    def valider_contrat(
-        self,
-        id_client: int,
-        date_debut: date,
-        date_fin_prevue: date,
-        article_ids: list[int],
-    ):
-        # 1) validations
+    def valider_contrat(self, id_client: int, date_debut: date, date_fin_prevue: date, article_ids: list[int]):
         if id_client <= 0:
             raise ValueError("id_client invalide.")
         if not article_ids:
@@ -134,27 +112,21 @@ class LocamatService:
         if nb_jours <= 0:
             raise ValueError("La date de fin doit être après la date de début.")
 
-        # 2) client
         client = self.clients_dal.get_by_id(id_client)
         if not client:
             raise ValueError("Client introuvable.")
 
-        # D) blocage si le client a UNE LOCATION EN COURS EN RETARD
-        # (ça ne contredit pas l'algorithme 'retard dernière location', c'est différent)
         if self.contrats_dal.client_a_location_en_retard(id_client):
             raise RuntimeError("Location refusée : ce client a déjà une location en retard (contrat en cours).")
 
-        # 3) articles + prix journaliers
         articles = self.articles_dal.get_by_ids(article_ids)
         if not articles or len(articles) != len(article_ids):
             raise ValueError("Certains articles sont introuvables.")
 
-        # 4) règles de pricing (celles du prof)
         remise_duree_pct = 10 if nb_jours > 7 else 0
         remise_vip_pct = 15 if client["est_vip"] else 0
         surcharge_retard_pct = 5 if client["a_eu_retard_derniere_location"] else 0
 
-        # 5) détail par article (C)
         lignes = []
         prix_base = 0.0
         prix_final = 0.0
@@ -186,7 +158,6 @@ class LocamatService:
         prix_base = round(prix_base, 2)
         prix_final = round(prix_final, 2)
 
-        # 6) transaction DB
         ok, result = self.contrats_dal.valider_contrat_transaction(
             id_client=id_client,
             date_debut=date_debut,
@@ -198,7 +169,6 @@ class LocamatService:
         if not ok:
             raise RuntimeError(result)
 
-        # payload complet pour ton message.html (C)
         return {
             "id_contrat": result,
             "id_client": id_client,

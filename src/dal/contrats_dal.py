@@ -50,13 +50,12 @@ class ContratsDAL:
                     conn.rollback()
                     return False, "Un ou plusieurs articles sont introuvables."
 
-                # Vérifie que tous sont Disponible
                 for (id_article, statut) in rows:
                     if statut != "Disponible":
                         conn.rollback()
                         return False, f"Conflit: l'article {id_article} n'est plus disponible (statut={statut})."
 
-                # 2) Règle métier : aucune ligne NonRetourne ne doit exister pour ces articles
+                # 2) Aucune ligne NonRetourne ne doit exister
                 cur.execute(
                     """
                     SELECT id_article, id_ligne
@@ -88,7 +87,7 @@ class ContratsDAL:
                 )
                 id_contrat = cur.fetchone()[0]
 
-                # 4) Insert lignes
+                # 4) Insert lignes (NOTE: PAS de date_retour_effective ici)
                 for l in lignes:
                     cur.execute(
                         """
@@ -97,9 +96,9 @@ class ContratsDAL:
                             prix_journalier_applique, nombre_jours,
                             remise_duree_pct, remise_vip_pct, surcharge_retard_pct,
                             prix_total_ligne,
-                            etat_retour, date_retour_effective
+                            etat_retour
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'NonRetourne', NULL);
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'NonRetourne');
                         """,
                         (
                             id_contrat,
@@ -137,15 +136,16 @@ class ContratsDAL:
             return False, "Erreur technique lors de la validation du contrat."
         finally:
             conn.close()
-            
+
     def client_a_location_en_retard(self, id_client: int) -> bool:
         conn = get_connection()
         if not conn:
             return False
-    
+
         try:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT 1
                     FROM contrats_location c
                     JOIN lignes_contrat lc ON lc.id_contrat = c.id_contrat
@@ -154,11 +154,12 @@ class ContratsDAL:
                       AND lc.etat_retour = 'NonRetourne'
                       AND c.date_fin_prevue < CURRENT_DATE
                     LIMIT 1;
-                """, (id_client,))
+                    """,
+                    (id_client,),
+                )
                 return cur.fetchone() is not None
         except Exception as e:
             log_critical_error("DAL Contrats client_a_location_en_retard", e)
             return False
         finally:
             conn.close()
-    
