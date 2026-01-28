@@ -55,25 +55,28 @@ class ContratsDAL:
                         conn.rollback()
                         return False, f"Conflit: l'article {id_article} n'est plus disponible (statut={statut})."
 
-                # 2) Aucune ligne NonRetourne ne doit exister
+                # 2) CORRECTIF: Vérifier qu'aucune ligne NonRetourne n'existe pour ces articles
+                # sur des contrats valides
                 cur.execute(
                     """
-                    SELECT id_article, id_ligne
-                    FROM lignes_contrat
-                    WHERE id_article = ANY(%s)
-                      AND etat_retour = 'NonRetourne'
+                    SELECT lc.id_article, lc.id_ligne, c.id_contrat
+                    FROM lignes_contrat lc
+                    JOIN contrats_location c ON c.id_contrat = lc.id_contrat
+                    WHERE lc.id_article = ANY(%s)
+                      AND lc.etat_retour = 'NonRetourne'
+                      AND c.statut = 'Valide'
                     LIMIT 1
-                    FOR UPDATE;
+                    FOR UPDATE OF lc;
                     """,
                     (article_ids,),
                 )
                 conflict = cur.fetchone()
                 if conflict:
-                    id_article_conflict, id_ligne_conflict = conflict
+                    id_article_conflict, id_ligne_conflict, id_contrat_conflict = conflict
                     conn.rollback()
                     return False, (
                         f"Conflit: l'article {id_article_conflict} a déjà une location non retournée "
-                        f"(ligne={id_ligne_conflict})."
+                        f"(ligne={id_ligne_conflict}, contrat={id_contrat_conflict})."
                     )
 
                 # 3) Insert contrat
@@ -138,6 +141,10 @@ class ContratsDAL:
             conn.close()
 
     def client_a_location_en_retard(self, id_client: int) -> bool:
+        """
+        CORRECTIF: Vérifie si le client a au moins une location en retard
+        (date_fin_prevue dépassée avec etat_retour='NonRetourne').
+        """
         conn = get_connection()
         if not conn:
             return False

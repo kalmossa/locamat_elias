@@ -12,7 +12,7 @@ class ArticlesDAL:
         Une location en cours = une ligne_contrat avec etat_retour='NonRetourne'
         sur un contrat_location statut='Valide'.
 
-        Important: on ne renvoie qu'UNE seule ligne active par article (pas de doublons).
+        CORRECTIF: Utilise DISTINCT ON pour éviter les doublons par article.
         """
         conn = get_connection()
         if not conn:
@@ -21,7 +21,7 @@ class ArticlesDAL:
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT
+                    SELECT DISTINCT ON (a.id_article)
                         a.id_article,
                         cat.libelle AS categorie,
                         m.libelle AS marque,
@@ -29,27 +29,19 @@ class ArticlesDAL:
                         a.numero_serie,
                         a.prix_journalier_actuel,
                         a.statut,
-                        active.date_fin_prevue,
-                        active.id_ligne
+                        c.date_fin_prevue,
+                        lc.id_ligne
                     FROM articles a
                     JOIN marques m ON m.id_marque = a.id_marque
                     JOIN categories cat ON cat.id_categorie = a.id_categorie
-
-                    -- récupère au plus une location ACTIVE par article
-                    LEFT JOIN LATERAL (
-                        SELECT
-                            lc.id_ligne,
-                            c.date_fin_prevue
-                        FROM lignes_contrat lc
-                        JOIN contrats_location c ON c.id_contrat = lc.id_contrat
-                        WHERE lc.id_article = a.id_article
-                          AND lc.etat_retour = 'NonRetourne'
-                          AND c.statut = 'Valide'
-                        ORDER BY lc.id_ligne DESC
-                        LIMIT 1
-                    ) active ON TRUE
-
-                    ORDER BY a.id_article;
+                    
+                    -- Jointure avec les lignes actives seulement
+                    LEFT JOIN lignes_contrat lc ON lc.id_article = a.id_article
+                        AND lc.etat_retour = 'NonRetourne'
+                    LEFT JOIN contrats_location c ON c.id_contrat = lc.id_contrat
+                        AND c.statut = 'Valide'
+                    
+                    ORDER BY a.id_article, lc.id_ligne DESC NULLS LAST;
                 """)
                 rows = cur.fetchall()
 

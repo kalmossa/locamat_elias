@@ -15,24 +15,30 @@ class RetoursDAL:
             with conn.cursor() as cur:
                 # 1) Lock ligne + récup infos
                 cur.execute("""
-                    SELECT id_article, id_contrat, etat_retour
-                    FROM lignes_contrat
-                    WHERE id_ligne = %s
-                    FOR UPDATE;
+                    SELECT lc.id_article, lc.id_contrat, lc.etat_retour, c.statut
+                    FROM lignes_contrat lc
+                    JOIN contrats_location c ON c.id_contrat = lc.id_contrat
+                    WHERE lc.id_ligne = %s
+                    FOR UPDATE OF lc;
                 """, (id_ligne,))
                 row = cur.fetchone()
                 if not row:
                     conn.rollback()
                     return False, "Ligne de contrat introuvable."
 
-                id_article, id_contrat, etat_actuel = row
+                id_article, id_contrat, etat_actuel, statut_contrat = row
 
-                # 2) Refus si déjà retourné
+                # 2) Vérifier que le contrat est valide
+                if statut_contrat != 'Valide':
+                    conn.rollback()
+                    return False, f"Le contrat n'est pas valide (statut={statut_contrat})."
+
+                # 3) Refus si déjà retourné
                 if etat_actuel != "NonRetourne":
                     conn.rollback()
                     return False, f"Retour déjà traité (etat_retour={etat_actuel})."
 
-                # 3) MAJ ligne (le retour vit dans lignes_contrat)
+                # 4) MAJ ligne (le retour vit dans lignes_contrat)
                 cur.execute("""
                     UPDATE lignes_contrat
                     SET date_retour_effective = %s,
@@ -44,7 +50,7 @@ class RetoursDAL:
                     conn.rollback()
                     return False, "Échec mise à jour ligne de contrat."
 
-                # 4) Lock article + remise en stock si possible
+                # 5) Lock article + remise en stock si possible
                 cur.execute("""
                     SELECT statut
                     FROM articles
@@ -66,7 +72,7 @@ class RetoursDAL:
                         WHERE id_article = %s;
                     """, (id_article,))
 
-                # 5) Si plus aucune ligne NonRetourne sur ce contrat => clôture
+                # 6) Si plus aucune ligne NonRetourne sur ce contrat => clôture
                 cur.execute("""
                     SELECT 1
                     FROM lignes_contrat
@@ -79,7 +85,7 @@ class RetoursDAL:
                         UPDATE contrats_location
                         SET statut = 'Cloture'
                         WHERE id_contrat = %s
-                          AND statut <> 'Cloture';
+                          AND statut = 'Valide';
                     """, (id_contrat,))
 
             conn.commit()
@@ -99,6 +105,10 @@ class RetoursDAL:
             conn.close()
 
     def get_non_retournes(self) -> list[dict]:
+        """
+        CORRECTIF: Retourne seulement les lignes non retournées des contrats valides,
+        sans doublons.
+        """
         conn = get_connection()
         if not conn:
             return []
@@ -106,7 +116,7 @@ class RetoursDAL:
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT
+                    SELECT DISTINCT
                         lc.id_ligne,
                         lc.id_contrat,
                         a.id_article,
