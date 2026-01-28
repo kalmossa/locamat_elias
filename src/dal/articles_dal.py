@@ -197,7 +197,23 @@ class ArticlesDAL:
 
                 statut_actuel = row[0]
 
-                # Règle : interdit de passer EnMaintenance/Rebut si l'article est loué
+                                # Refuse tout changement de statut si une location est en cours
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM lignes_contrat
+                    WHERE id_article = %s
+                      AND etat_retour = 'NonRetourne'
+                    LIMIT 1;
+                    """,
+                    (id_article,),
+                )
+                if cur.fetchone() and new_statut != "Loue":
+                    conn.rollback()
+                    return False, "Impossible : article actuellement loué."
+                
+                
+                                # Règle : interdit de passer EnMaintenance/Rebut si l'article est loué
                 if statut_actuel == "Loue" and new_statut in {"EnMaintenance", "Rebut"}:
                     conn.rollback()
                     return False, "Impossible : l'article est actuellement loué."

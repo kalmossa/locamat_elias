@@ -63,7 +63,6 @@ CREATE TABLE articles (
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    -- ✅ CDC: statuts obligatoires
     CONSTRAINT ck_articles_statut
         CHECK (statut IN ('Disponible','Loue','EnMaintenance','Rebut')),
 
@@ -116,16 +115,22 @@ CREATE TABLE lignes_contrat (
 
     prix_total_ligne NUMERIC(12,2) NOT NULL,
 
+    -- IMPORTANT: utilisé dans tes DAL
+    etat_retour VARCHAR(20) NOT NULL DEFAULT 'NonRetourne',
+    date_retour_effective DATE NULL,
+
     CONSTRAINT fk_ligne_contrat
         FOREIGN KEY (id_contrat) REFERENCES contrats_location(id_contrat)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
-    -- ✅ CDC intégrité 1 : suppression article interdite s'il a des lignes de contrat
     CONSTRAINT fk_ligne_article
         FOREIGN KEY (id_article) REFERENCES articles(id_article)
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
+
+    CONSTRAINT ck_lignes_etat_retour
+        CHECK (etat_retour IN ('NonRetourne','Retourne')),
 
     CONSTRAINT uq_ligne_unique_article_par_contrat
         UNIQUE (id_contrat, id_article),
@@ -143,13 +148,12 @@ CREATE TABLE lignes_contrat (
 );
 
 -- =========================================================
--- 4) RETOURS (par ligne => par article loué)
+-- 4) RETOURS (optionnel: table historique séparée)
 -- =========================================================
 
 CREATE TABLE retours (
     id_retour SERIAL PRIMARY KEY,
-    id_ligne INT NOT NULL UNIQUE, -- 1 retour max par ligne
-
+    id_ligne INT NOT NULL UNIQUE,
     date_retour_effective DATE NOT NULL,
     etat_retour VARCHAR(20) NOT NULL DEFAULT 'Retourne',
     commentaire VARCHAR(255),
@@ -164,7 +168,7 @@ CREATE TABLE retours (
 );
 
 -- =========================================================
--- 5) INDEX UTILES (dashboard/perf)
+-- 5) INDEX UTILES
 -- =========================================================
 
 CREATE INDEX idx_contrats_date_fin_prevue ON contrats_location(date_fin_prevue);
@@ -174,10 +178,3 @@ CREATE INDEX idx_lignes_contrat_id_contrat ON lignes_contrat(id_contrat);
 CREATE INDEX idx_lignes_contrat_id_article ON lignes_contrat(id_article);
 
 CREATE INDEX idx_articles_statut ON articles(statut);
-
--- =========================================================
--- 6) NOTES IMPORTANTES (CDC)
--- =========================================================
--- CDC "Disponible -> Loue uniquement si Disponible"
--- => implémenté dans 003_constraints.sql via un TRIGGER SGBD
--- (et aussi respecté côté DAL/BLL pour la transaction panier)

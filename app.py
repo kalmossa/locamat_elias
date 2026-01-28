@@ -1,8 +1,8 @@
 import os
-
-from flask import Flask, render_template, request, redirect, url_for
-from psycopg2 import OperationalError
 from datetime import date
+
+from flask import Flask, render_template, request, redirect, url_for, session
+from psycopg2 import OperationalError
 
 from src.bll.locamat_service import LocamatService
 from src.database_config import get_connection
@@ -10,23 +10,25 @@ from src.database_config import get_connection
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")  # nécessaire pour session
+
     service = LocamatService()
 
     # =========================
     # UI : Accueil (vitrine)
     # =========================
- # ✅ Accueil = vitrine
     @app.route("/")
     def home():
         return render_template("home.html", title="LOCA-MAT ENTREPRISE")
 
-    # ✅ Dashboard UI = page manager distincte
+    # =========================
+    # UI : Dashboard
+    # =========================
     @app.route("/dashboard/ui")
     def dashboard_ui():
         dash = service.dashboard()
         return render_template("dashboard.html", title="Dashboard", dash=dash)
 
-    # (tu peux garder /dashboard en JSON si tu veux)
     @app.route("/dashboard")
     def dashboard():
         return service.dashboard()
@@ -41,13 +43,13 @@ def create_app() -> Flask:
             conn = get_connection()
             if conn is None:
                 return {"status": "ok", "db": "error", "detail": "No connection"}, 503
-    
+
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
                 cur.fetchone()
-    
+
             return {"status": "ok", "db": "ok"}
-    
+
         except OperationalError as e:
             return {"status": "ok", "db": "error", "detail": str(e)}, 503
         except Exception as e:
@@ -62,10 +64,9 @@ def create_app() -> Flask:
     @app.route("/articles/ui")
     def articles_ui():
         data = service.lister_articles_avec_location()
-        stock = service.stock_resume()  # <-- on ajoute un résumé stock
+        stock = service.stock_resume()
         return render_template("articles_list.html", title="Articles", articles=data, stock=stock)
 
-    # API
     @app.route("/articles")
     def articles():
         items = service.lister_articles()
@@ -77,7 +78,7 @@ def create_app() -> Flask:
         return {"count": len(items), "items": items}
 
     # =========================
-    # UI : Changer statut (SANS "Loue" depuis ici)
+    # UI : Changer statut
     # =========================
     @app.route("/articles/<int:id_article>/statut", methods=["POST"])
     def update_article_statut(id_article: int):
@@ -89,7 +90,6 @@ def create_app() -> Flask:
             return render_template("error.html", title="Changement impossible", message=str(e)), 409
         except Exception as e:
             return render_template("error.html", title="Erreur", message=str(e)), 500
-
 
     # =========================
     # UI : Supprimer article
@@ -105,7 +105,18 @@ def create_app() -> Flask:
             return render_template("error.html", title="Erreur", message=str(e)), 500
 
     # =========================
-    # UI : Louer
+    # UI : Message (PRG)
+    # =========================
+    @app.route("/message/ui")
+    def message_ui():
+        payload = session.pop("last_payload", None)
+        title = session.pop("last_title", "Message")
+        if payload is None:
+            return redirect(url_for("home"))
+        return render_template("message.html", title=title, payload=payload)
+
+    # =========================
+    # UI : Louer (contrats)
     # =========================
     @app.route("/contrats/ui", methods=["GET", "POST"])
     def contrats_ui():
@@ -120,26 +131,43 @@ def create_app() -> Flask:
             )
 
         try:
-            raw_client = request.form.get("id_client", "").strip()
+            # 1) lire / valider champs (SANS créer client tout de suite)
+            raw_client = (request.form.get("id_client") or "").strip()
+            if not raw_client:
+                raise ValueError("Choisis un client.")
 
-            if raw_client == "__NEW__":
-                nom = request.form.get("new_nom", "").strip()
-                prenom = request.form.get("new_prenom", "").strip()
-                est_vip = (request.form.get("new_est_vip") == "on")
-                payload_client = service.creer_client(nom, prenom, est_vip)
-                id_client = int(payload_client["id_client"])
-            else:
-                id_client = int(raw_client)
+            date_debut_str = request.form.get("date_debut")
+            date_fin_str = request.form.get("date_fin_prevue")
+            if not date_debut_str or not date_fin_str:
+                raise ValueError("Dates obligatoires.")
 
-            date_debut = date.fromisoformat(request.form["date_debut"])
-            date_fin = date.fromisoformat(request.form["date_fin_prevue"])
+            date_debut = date.fromisoformat(date_debut_str)
+            date_fin = date.fromisoformat(date_fin_str)
 
             article_ids = [int(x) for x in request.form.getlist("article_ids")]
             if not article_ids:
                 raise ValueError("Sélectionne au moins un article disponible.")
 
+            # 2) résoudre id_client seulement maintenant
+            if raw_client == "__NEW__":
+                nom = (request.form.get("new_nom") or "").strip()
+                prenom = (request.form.get("new_prenom") or "").strip()
+                est_vip = (request.form.get("new_est_vip") == "on")
+                if not nom or not prenom:
+                    raise ValueError("Nom et prénom obligatoires pour un nouveau client.")
+
+                payload_client = service.creer_client(nom, prenom, est_vip)
+                id_client = int(payload_client["id_client"])
+            else:
+                id_client = int(raw_client)
+
+            # 3) valider contrat
             result = service.valider_contrat(id_client, date_debut, date_fin, article_ids)
-            return render_template("message.html", title="Contrat validé", payload=result)
+
+            # 4) PRG : éviter doublons si refresh
+            session["last_payload"] = result
+            session["last_title"] = "Contrat validé"
+            return redirect(url_for("message_ui"))
 
         except Exception as e:
             clients = service.lister_clients()
@@ -153,7 +181,7 @@ def create_app() -> Flask:
             ), 400
 
     # =========================
-    # UI : Retour (dropdown)
+    # UI : Retour
     # =========================
     @app.route("/retours/ui", methods=["GET", "POST"])
     def retours_ui():
@@ -166,14 +194,23 @@ def create_app() -> Flask:
             date_retour = date.fromisoformat(request.form["date_retour_effective"])
 
             result = service.enregistrer_retour(id_ligne, date_retour)
-            # IMPORTANT: message.html doit tolérer payloads différents (contrat vs retour)
-            return render_template("message.html", title="Retour enregistré", payload=result)
+
+            # PRG : éviter doublons au refresh
+            session["last_payload"] = result
+            session["last_title"] = "Retour enregistré"
+            return redirect(url_for("message_ui"))
 
         except Exception as e:
             retours = service.lister_retours_possibles()
-            return render_template("retour_form.html", title="Enregistrer un retour", retours=retours, error=str(e)), 400
+            return render_template(
+                "retour_form.html",
+                title="Enregistrer un retour",
+                retours=retours,
+                error=str(e),
+            ), 400
 
     return app
+
 
 app = create_app()
 
