@@ -1,8 +1,3 @@
--- =========================================================
--- LOCA-MAT - schema.sql (PostgreSQL)
--- Tables + contraintes + index
--- =========================================================
-
 DROP TABLE IF EXISTS retours CASCADE;
 DROP TABLE IF EXISTS lignes_contrat CASCADE;
 DROP TABLE IF EXISTS contrats_location CASCADE;
@@ -11,9 +6,7 @@ DROP TABLE IF EXISTS marques CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS clients CASCADE;
 
--- =========================================================
--- 1) TABLES DE REFERENCE
--- =========================================================
+-- 1) TABLES DE REf
 
 CREATE TABLE clients (
     id_client SERIAL PRIMARY KEY,
@@ -35,9 +28,9 @@ CREATE TABLE marques (
     libelle VARCHAR(100) NOT NULL UNIQUE
 );
 
--- =========================================================
+
 -- 2) PARC MATERIEL
--- =========================================================
+
 
 CREATE TABLE articles (
     id_article SERIAL PRIMARY KEY,
@@ -68,9 +61,7 @@ CREATE TABLE articles (
         CHECK (prix_journalier_actuel >= 0)
 );
 
--- =========================================================
 -- 3) CONTRATS + LIGNES
--- =========================================================
 
 CREATE TABLE contrats_location (
     id_contrat SERIAL PRIMARY KEY,
@@ -113,7 +104,7 @@ CREATE TABLE lignes_contrat (
 
     prix_total_ligne NUMERIC(12,2) NOT NULL,
 
-    -- retour géré ici (source de vérité)
+    -- retour ici 
     etat_retour VARCHAR(20) NOT NULL DEFAULT 'NonRetourne',
     date_retour_effective DATE,
 
@@ -142,11 +133,7 @@ CREATE TABLE lignes_contrat (
     CONSTRAINT ck_lignes_etat_retour
         CHECK (etat_retour IN ('NonRetourne','Retourne'))
 );
-
--- =========================================================
 -- 4) RETOURS (optionnel: historique séparé)
--- Tu peux le garder, mais ton code n'en dépend pas.
--- =========================================================
 
 CREATE TABLE retours (
     id_retour SERIAL PRIMARY KEY,
@@ -165,9 +152,6 @@ CREATE TABLE retours (
         CHECK (etat_retour IN ('Retourne','Litige','Casse'))
 );
 
--- =========================================================
--- 5) INDEX
--- =========================================================
 
 CREATE INDEX idx_contrats_date_fin_prevue ON contrats_location(date_fin_prevue);
 CREATE INDEX idx_contrats_statut ON contrats_location(statut);

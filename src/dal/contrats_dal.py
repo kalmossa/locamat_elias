@@ -55,8 +55,8 @@ class ContratsDAL:
                         conn.rollback()
                         return False, f"Conflit: l'article {id_article} n'est plus disponible (statut={statut})."
 
-                # 2) CORRECTIF: Vérifier qu'aucune ligne NonRetourne n'existe pour ces articles
-                # sur des contrats valides
+                # 2)  Vérifie qu'aucune ligne NonRetourne n'existe pour ces articles valides
+                
                 cur.execute(
                     """
                     SELECT lc.id_article, lc.id_ligne, c.id_contrat
