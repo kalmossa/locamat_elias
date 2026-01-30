@@ -83,3 +83,15 @@ et avec ce lien en cloud : https://locamat-elias.onrender.com
 Les erreurs SQL critiques sont loggées dans :
 
 logs/db_errors.log
+
++) Reset complet de la DB 
+
+faire: 
+
+DROP TABLE IF EXISTS retours CASCADE;
+DROP TABLE IF EXISTS lignes_contrat CASCADE;
+DROP TABLE IF EXISTS contrats_location CASCADE;
+DROP TABLE IF EXISTS articles CASCADE;
+DROP TABLE IF EXISTS marques CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS clients CASCADE;
