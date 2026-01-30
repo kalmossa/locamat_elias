@@ -1,4 +1,3 @@
-from __future__ import annotations
 from psycopg2 import errors
 from src.database_config import get_connection, log_critical_error
 
@@ -6,67 +5,45 @@ from src.database_config import get_connection, log_critical_error
 class ArticlesDAL:
     STATUTS = {"Disponible", "Loue", "EnMaintenance", "Rebut"}
 
-    def get_all_with_location(self) -> list[dict]:
-        """
-        Retourne tous les articles + infos de location en cours (si existe).
-        Une location en cours = une ligne_contrat avec etat_retour='NonRetourne'
-        sur un contrat_location statut='Valide'.
-
-        CORRECTIF: Utilise DISTINCT ON pour éviter les doublons par article.
-        """
+    def get_all_with_location(self):
+        """Tous les articles + loc en cours si existe"""
         conn = get_connection()
         if not conn:
             return []
 
         try:
             with conn.cursor() as cur:
+                # DISTINCT ON pour éviter doublons
                 cur.execute("""
                     SELECT DISTINCT ON (a.id_article)
-                        a.id_article,
-                        cat.libelle AS categorie,
-                        m.libelle AS marque,
-                        a.modele,
-                        a.numero_serie,
-                        a.prix_journalier_actuel,
-                        a.statut,
-                        c.date_fin_prevue,
-                        lc.id_ligne
+                        a.id_article, cat.libelle, m.libelle, a.modele, a.numero_serie,
+                        a.prix_journalier_actuel, a.statut, c.date_fin_prevue, lc.id_ligne
                     FROM articles a
                     JOIN marques m ON m.id_marque = a.id_marque
                     JOIN categories cat ON cat.id_categorie = a.id_categorie
-                    
-                    -- Jointure avec les lignes actives seulement
                     LEFT JOIN lignes_contrat lc ON lc.id_article = a.id_article
                         AND lc.etat_retour = 'NonRetourne'
                     LEFT JOIN contrats_location c ON c.id_contrat = lc.id_contrat
                         AND c.statut = 'Valide'
-                    
                     ORDER BY a.id_article, lc.id_ligne DESC NULLS LAST;
                 """)
                 rows = cur.fetchall()
 
-            return [
-                {
-                    "id_article": r[0],
-                    "categorie": r[1],
-                    "marque": r[2],
-                    "modele": r[3],
-                    "numero_serie": r[4],
-                    "prix_journalier_actuel": float(r[5]),
-                    "statut": r[6],
-                    "date_fin_prevue": r[7].isoformat() if r[7] else None,
-                    "id_ligne": r[8],
-                }
-                for r in rows
-            ]
-
+            return [{
+                "id_article": r[0], "categorie": r[1], "marque": r[2],
+                "modele": r[3], "numero_serie": r[4],
+                "prix_journalier_actuel": float(r[5]), "statut": r[6],
+                "date_fin_prevue": r[7].isoformat() if r[7] else None,
+                "id_ligne": r[8],
+            } for r in rows]
         except Exception as e:
-            log_critical_error("DAL Articles get_all_with_location", e)
+            log_critical_error("articles get_all_with_location", e)
             return []
         finally:
             conn.close()
 
-    def get_disponibles(self) -> list[dict]:
+    def get_disponibles(self):
+        """Articles dispo seulement"""
         conn = get_connection()
         if not conn:
             return []
@@ -74,13 +51,8 @@ class ArticlesDAL:
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT
-                        a.id_article,
-                        c.libelle AS categorie,
-                        m.libelle AS marque,
-                        a.modele,
-                        a.numero_serie,
-                        a.prix_journalier_actuel
+                    SELECT a.id_article, c.libelle, m.libelle, a.modele,
+                           a.numero_serie, a.prix_journalier_actuel
                     FROM articles a
                     JOIN categories c ON c.id_categorie = a.id_categorie
                     JOIN marques m ON m.id_marque = a.id_marque
@@ -89,24 +61,19 @@ class ArticlesDAL:
                 """)
                 rows = cur.fetchall()
 
-            return [
-                {
-                    "id_article": r[0],
-                    "categorie": r[1],
-                    "marque": r[2],
-                    "modele": r[3],
-                    "numero_serie": r[4],
-                    "prix_journalier_actuel": float(r[5]),
-                }
-                for r in rows
-            ]
+            return [{
+                "id_article": r[0], "categorie": r[1], "marque": r[2],
+                "modele": r[3], "numero_serie": r[4],
+                "prix_journalier_actuel": float(r[5]),
+            } for r in rows]
         except Exception as e:
-            log_critical_error("DAL Articles get_disponibles", e)
+            log_critical_error("articles get_disponibles", e)
             return []
         finally:
             conn.close()
 
-    def get_by_ids(self, article_ids: list[int]) -> list[dict]:
+    def get_by_ids(self, article_ids):
+        """Récup articles par liste d'ids"""
         if not article_ids:
             return []
 
@@ -126,42 +93,38 @@ class ArticlesDAL:
 
             return [{"id_article": r[0], "prix_journalier_actuel": float(r[1])} for r in rows]
         except Exception as e:
-            log_critical_error("DAL Articles get_by_ids", e)
+            log_critical_error("articles get_by_ids", e)
             return []
         finally:
             conn.close()
 
-    def delete_if_possible(self, id_article: int):
+    def delete_if_possible(self, id_article):
+        """Delete article si pas lié à contrat"""
         conn = get_connection()
         if not conn:
             return False, "Connexion DB impossible"
 
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    DELETE FROM articles
-                    WHERE id_article = %s;
-                """, (id_article,))
-
+                cur.execute("DELETE FROM articles WHERE id_article = %s;", (id_article,))
                 if cur.rowcount == 0:
                     conn.rollback()
                     return False, "Article introuvable."
 
             conn.commit()
             return True, "Article supprimé."
-
         except errors.ForeignKeyViolation:
             conn.rollback()
-            return False, "Suppression impossible : article lié à un contrat passé ou en cours."
+            return False, "Suppression impossible : article lié à un contrat."
         except Exception as e:
             conn.rollback()
-            log_critical_error("DAL Articles delete_if_possible", e)
-            return False, "Erreur technique lors de la suppression."
+            log_critical_error("articles delete", e)
+            return False, "Erreur technique."
         finally:
             conn.close()
 
-    def update_statut(self, id_article: int, new_statut: str):
-        """Change le statut d'un article avec règles de cohérence simples."""
+    def update_statut(self, id_article, new_statut):
+        """Change statut article"""
         if new_statut not in self.STATUTS:
             return False, "Statut invalide."
 
@@ -173,57 +136,44 @@ class ArticlesDAL:
             conn.autocommit = False
             with conn.cursor() as cur:
                 # lock article
-                cur.execute("""
-                    SELECT statut
-                    FROM articles
-                    WHERE id_article = %s
-                    FOR UPDATE;
-                """, (id_article,))
+                cur.execute("SELECT statut FROM articles WHERE id_article = %s FOR UPDATE;", (id_article,))
                 row = cur.fetchone()
                 if not row:
                     conn.rollback()
                     return False, "Article introuvable."
 
-                # Interdire toute modif manuelle si location en cours (etat_retour=NonRetourne)
+                # check pas loué actuellement
                 cur.execute("""
-                    SELECT 1
-                    FROM lignes_contrat
-                    WHERE id_article = %s
-                      AND etat_retour = 'NonRetourne'
+                    SELECT 1 FROM lignes_contrat
+                    WHERE id_article = %s AND etat_retour = 'NonRetourne'
                     LIMIT 1;
                 """, (id_article,))
                 if cur.fetchone():
                     conn.rollback()
-                    return False, "Impossible : article actuellement loué."
+                    return False, "Impossible : article loué."
 
-                cur.execute("""
-                    UPDATE articles
-                    SET statut = %s
-                    WHERE id_article = %s;
-                """, (new_statut, id_article))
+                # maj
+                cur.execute("UPDATE articles SET statut = %s WHERE id_article = %s;",
+                          (new_statut, id_article))
 
             conn.commit()
             return True, "Statut mis à jour."
-
         except Exception as e:
             conn.rollback()
-            log_critical_error("DAL Articles update_statut", e)
-            return False, "Erreur technique lors de la mise à jour du statut."
+            log_critical_error("articles update_statut", e)
+            return False, "Erreur technique."
         finally:
             conn.close()
 
-    def stock_resume(self) -> dict:
+    def stock_resume(self):
+        """Count par statut"""
         conn = get_connection()
         if not conn:
             return {"Disponible": 0, "Loue": 0, "EnMaintenance": 0, "Rebut": 0}
 
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT statut, COUNT(*)
-                    FROM articles
-                    GROUP BY statut;
-                """)
+                cur.execute("SELECT statut, COUNT(*) FROM articles GROUP BY statut;")
                 rows = cur.fetchall()
 
             stock = {"Disponible": 0, "Loue": 0, "EnMaintenance": 0, "Rebut": 0}
@@ -231,9 +181,8 @@ class ArticlesDAL:
                 if statut in stock:
                     stock[statut] = int(cnt)
             return stock
-
         except Exception as e:
-            log_critical_error("DAL Articles stock_resume", e)
+            log_critical_error("articles stock_resume", e)
             return {"Disponible": 0, "Loue": 0, "EnMaintenance": 0, "Rebut": 0}
         finally:
             conn.close()
