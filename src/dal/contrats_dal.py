@@ -1,27 +1,16 @@
-# src/dal/contrats_dal.py
-from __future__ import annotations
-
 from src.database_config import get_connection, log_critical_error
 
 
 class ContratsDAL:
-    def valider_contrat_transaction(
-        self,
-        id_client: int,
-        date_debut,
-        date_fin_prevue,
-        article_ids: list[int],
-        prix_final: float,
-        lignes: list[dict],
-    ):
+    
+    def valider_contrat_transaction(self, id_client, date_debut, date_fin_prevue, 
+                                    article_ids, prix_final, lignes):
         """
-        Transaction atomique :
-        - verrouille les articles (FOR UPDATE) pour éviter double location
-        - refuse si déjà loué (statut != 'Disponible')
-        - refuse si une ligne NonRetourne existe pour l'article
-        - crée le contrat (statut = 'Valide')
-        - crée les lignes (etat_retour = 'NonRetourne')
-        - passe les articles en 'Loue'
+        Transaction atomique pour créer contrat:
+        - lock articles (FOR UPDATE)
+        - check dispo
+        - insert contrat + lignes
+        - maj statut articles
         """
         conn = get_connection()
         if not conn:
@@ -34,139 +23,96 @@ class ContratsDAL:
                     conn.rollback()
                     return False, "Aucun article sélectionné."
 
-                # 1) Lock + vérif statut articles
-                cur.execute(
-                    """
-                    SELECT id_article, statut
-                    FROM articles
-                    WHERE id_article = ANY(%s)
-                    FOR UPDATE;
-                    """,
-                    (article_ids,),
-                )
+                # lock + check statut articles
+                cur.execute("""
+                    SELECT id_article, statut FROM articles
+                    WHERE id_article = ANY(%s) FOR UPDATE;
+                """, (article_ids,))
                 rows = cur.fetchall()
 
                 if len(rows) != len(article_ids):
                     conn.rollback()
-                    return False, "Un ou plusieurs articles sont introuvables."
+                    return False, "Un ou plusieurs articles introuvables."
 
                 for (id_article, statut) in rows:
                     if statut != "Disponible":
                         conn.rollback()
-                        return False, f"Conflit: l'article {id_article} n'est plus disponible (statut={statut})."
+                        return False, f"Conflit: article {id_article} pas dispo (statut={statut})."
 
-                # 2)  Vérifie qu'aucune ligne NonRetourne n'existe pour ces articles valides
-                
-                cur.execute(
-                    """
+                # check pas de loc active existante
+                cur.execute("""
                     SELECT lc.id_article, lc.id_ligne, c.id_contrat
                     FROM lignes_contrat lc
                     JOIN contrats_location c ON c.id_contrat = lc.id_contrat
                     WHERE lc.id_article = ANY(%s)
                       AND lc.etat_retour = 'NonRetourne'
                       AND c.statut = 'Valide'
-                    LIMIT 1
-                    FOR UPDATE OF lc;
-                    """,
-                    (article_ids,),
-                )
+                    LIMIT 1 FOR UPDATE OF lc;
+                """, (article_ids,))
                 conflict = cur.fetchone()
                 if conflict:
-                    id_article_conflict, id_ligne_conflict, id_contrat_conflict = conflict
+                    id_art, id_lig, id_con = conflict
                     conn.rollback()
-                    return False, (
-                        f"Conflit: l'article {id_article_conflict} a déjà une location non retournée "
-                        f"(ligne={id_ligne_conflict}, contrat={id_contrat_conflict})."
-                    )
+                    return False, f"Conflit: article {id_art} déjà loué (ligne={id_lig}, contrat={id_con})."
 
-                # 3) Insert contrat
-                cur.execute(
-                    """
+                # insert contrat
+                cur.execute("""
                     INSERT INTO contrats_location (id_client, date_debut, date_fin_prevue, prix_final, statut)
-                    VALUES (%s, %s, %s, %s, 'Valide')
-                    RETURNING id_contrat;
-                    """,
-                    (id_client, date_debut, date_fin_prevue, prix_final),
-                )
+                    VALUES (%s, %s, %s, %s, 'Valide') RETURNING id_contrat;
+                """, (id_client, date_debut, date_fin_prevue, prix_final))
                 id_contrat = cur.fetchone()[0]
 
-                # 4) Insert lignes (NOTE: PAS de date_retour_effective ici)
+                # insert lignes
                 for l in lignes:
-                    cur.execute(
-                        """
+                    cur.execute("""
                         INSERT INTO lignes_contrat (
-                            id_contrat, id_article,
-                            prix_journalier_applique, nombre_jours,
+                            id_contrat, id_article, prix_journalier_applique, nombre_jours,
                             remise_duree_pct, remise_vip_pct, surcharge_retard_pct,
-                            prix_total_ligne,
-                            etat_retour
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'NonRetourne');
-                        """,
-                        (
-                            id_contrat,
-                            l["id_article"],
-                            l["prix_journalier_applique"],
-                            l["nombre_jours"],
-                            l.get("remise_duree_pct", 0),
-                            l.get("remise_vip_pct", 0),
-                            l.get("surcharge_retard_pct", 0),
-                            l["prix_total_ligne"],
-                        ),
-                    )
+                            prix_total_ligne, etat_retour
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'NonRetourne');
+                    """, (id_contrat, l["id_article"], l["prix_journalier_applique"],
+                          l["nombre_jours"], l.get("remise_duree_pct", 0),
+                          l.get("remise_vip_pct", 0), l.get("surcharge_retard_pct", 0),
+                          l["prix_total_ligne"]))
 
-                # 5) Update articles -> Loue
-                cur.execute(
-                    """
-                    UPDATE articles
-                    SET statut = 'Loue'
-                    WHERE id_article = ANY(%s)
-                      AND statut = 'Disponible';
-                    """,
-                    (article_ids,),
-                )
+                # maj articles -> Loue
+                cur.execute("""
+                    UPDATE articles SET statut = 'Loue'
+                    WHERE id_article = ANY(%s) AND statut = 'Disponible';
+                """, (article_ids,))
 
                 if cur.rowcount != len(article_ids):
                     conn.rollback()
-                    return False, "Conflit: mise à jour article impossible (statut inattendu)."
+                    return False, "Conflit: maj article impossible."
 
             conn.commit()
             return True, id_contrat
-
         except Exception as e:
             conn.rollback()
-            log_critical_error("DAL Contrats valider_contrat_transaction", e)
-            return False, "Erreur technique lors de la validation du contrat."
+            log_critical_error("contrats valider_transaction", e)
+            return False, "Erreur technique."
         finally:
             conn.close()
 
-    def client_a_location_en_retard(self, id_client: int) -> bool:
-        """
-        CORRECTIF: Vérifie si le client a au moins une location en retard
-        (date_fin_prevue dépassée avec etat_retour='NonRetourne').
-        """
+    def client_a_location_en_retard(self, id_client):
+        """Check si client a loc en retard"""
         conn = get_connection()
         if not conn:
             return False
 
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT 1
-                    FROM contrats_location c
+                cur.execute("""
+                    SELECT 1 FROM contrats_location c
                     JOIN lignes_contrat lc ON lc.id_contrat = c.id_contrat
-                    WHERE c.id_client = %s
-                      AND c.statut = 'Valide'
+                    WHERE c.id_client = %s AND c.statut = 'Valide'
                       AND lc.etat_retour = 'NonRetourne'
                       AND c.date_fin_prevue < CURRENT_DATE
                     LIMIT 1;
-                    """,
-                    (id_client,),
-                )
+                """, (id_client,))
                 return cur.fetchone() is not None
         except Exception as e:
-            log_critical_error("DAL Contrats client_a_location_en_retard", e)
+            log_critical_error("contrats check_retard", e)
             return False
         finally:
             conn.close()
