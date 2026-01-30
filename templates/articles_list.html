@@ -2,32 +2,32 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>{{ title }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <title>{{ title }}</title>  <!-- titre dynamique passé par Flask -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> <!-- lien vers CSS -->
 </head>
 <body>
-  <div class="container">
-    <header class="topbar">
+  <div class="container"> <!-- conteneur principal -->
+    <header class="topbar"> <!-- barre de navigation en haut -->
       <h1>{{ title }}</h1>
-      <nav class="nav">
+      <nav class="nav"> <!-- menu de navigation -->
         <a class="btn" href="{{ url_for('home') }}">Accueil</a>
         <a class="btn" href="{{ url_for('dashboard_ui') }}">Dashboard</a>
-        <a class="btn" href="{{ url_for('contrats_ui') }}">Louer</a>
+        <a class="btn" href="{{ url_for('contrats_ui') }}">Louer</a>    
         <a class="btn" href="{{ url_for('retours_ui') }}">Rendre un article</a>
       </nav>
     </header>
 
-    <section class="card">
-      {% if not articles %}
-        <p>Aucun article.</p>
-      {% else %}
+    <section class="card">  <!-- section principale avec style "carte" -->
+      {% if not articles %} <!-- si la liste des articles est vide -->
+        <p>Aucun article.</p> <!-- message d'absence d'articles -->
+      {% else %}  <!-- sinon, afficher la liste des articles -->
 
-        {% if stock %}
-          <div class="kpi">
-            <div class="kpi-title">État des stocks</div>
-            <div class="kpi-value">
-              Dispo: {{ stock["Disponible"] }} —
-              Loués: {{ stock["Loue"] }} —
+        {% if stock %}  <!-- si les infos de stock sont disponibles -->
+          <div class="kpi"> 
+            <div class="kpi-title">État des stocks</div>  
+            <div class="kpi-value"> 
+              Dispo: {{ stock["Disponible"] }} —    
+              Loués: {{ stock["Loue"] }} —    
               Maintenance: {{ stock["EnMaintenance"] }} —
               Rebut: {{ stock["Rebut"] }}
             </div>
@@ -35,7 +35,7 @@
           <div style="height:12px;"></div>
         {% endif %}
 
-        <table class="table">
+        <table class="table"> <!-- tableau pour afficher les articles -->
           <thead>
             <tr>
               <th>ID</th>
@@ -46,37 +46,37 @@
               <th>Prix/j</th>
               <th>Statut</th>
               <th>Retour prévu</th>
-              <th>ID ligne</th>
+              <th>ID ligne</th> 
               <th>Actions</th>
             </tr>
           </thead>
 
           <tbody>
-            {% for a in articles %}
+            {% for a in articles %} <!-- boucle sur chaque article -->
               <tr>
-                <td>{{ a["id_article"] }}</td>
+                <td>{{ a["id_article"] }}</td>  
                 <td>{{ a["categorie"] }}</td>
                 <td>{{ a["marque"] }}</td>
                 <td>{{ a["modele"] }}</td>
                 <td>{{ a["numero_serie"] }}</td>
-                <td>{{ a["prix_journalier_actuel"] }}</td>
+                <td>{{ a["prix_journalier_actuel"] }}</td>    
 
-                <td>
-                  {% if a["statut"] == "Disponible" %}
-                    <span class="badge dispo">Disponible</span>
+                <td>  <!-- affichage visuel du statut -->
+                  {% if a["statut"] == "Disponible" %}      
+                    <span class="badge dispo">Disponible</span>   
                   {% else %}
                     <span class="badge loue">{{ a["statut"] }}</span>
                   {% endif %}
                 </td>
 
-                <td>{{ a["date_fin_prevue"] if a["date_fin_prevue"] else "—" }}</td>
-                <td>{{ a["id_ligne"] if a["id_ligne"] else "—" }}</td>
+                <td>{{ a["date_fin_prevue"] if a["date_fin_prevue"] else "—" }}</td>                 <!-- date de retour prévue si location en cours -->
+                <td>{{ a["id_ligne"] if a["id_ligne"] else "—" }}</td> <!-- id de la ligne de contrat active -->
 
                 <td class="actions">
-                  {% if a["id_ligne"] %}
+                  {% if a["id_ligne"] %}    <!-- si article lié à une ligne active, on bloque les actions -->
                     <span class="muted">Location en cours</span>
-                  {% else %}
-                    <form method="post"
+                  {% else %}   <!-- formulaire de changement de statut -->
+                    <form method="post" 
                           action="{{ url_for('update_article_statut', id_article=a['id_article']) }}"
                           style="display:inline;">
                       <select name="statut">
@@ -87,8 +87,8 @@
                       <button class="btn" type="submit">OK</button>
                     </form>
                   {% endif %}
-
-                  <form method="post"
+                      <!-- suppression de l'article (protégée côté DB par FK) -->
+                  <form method="post"  
                         action="{{ url_for('delete_article', id_article=a['id_article']) }}"
                         onsubmit="return confirm('Supprimer cet article ?');"
                         style="display:inline;">

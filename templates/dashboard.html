@@ -7,7 +7,7 @@
 </head>
 <body>
   <div class="container">
-    <header class="topbar">
+    <header class="topbar">  <!-- topbar : accès rapide aux modules -->
       <h1>{{ title }}</h1>
 
       <nav class="nav">
@@ -15,10 +15,6 @@
         <a class="btn" href="{{ url_for('articles_ui') }}">Articles</a>
         <a class="btn" href="{{ url_for('contrats_ui') }}">Louer</a>
         <a class="btn" href="{{ url_for('retours_ui') }}">Rendre un article</a>
-
-        <!-- debug optionnel -->
-        <!-- <a class="btn btn-ghost" href="{{ url_for('health') }}">Health (JSON)</a>
-        <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Dashboard (JSON)</a> -->
       </nav>
     </header>
 
@@ -45,14 +41,14 @@
         <div class="panel">
           <h3>Alertes retards</h3>
           <ul>
-            {% for al in dash.alertes_retards %}
+            {% for al in dash.alertes_retards %}  <!-- alertes retards : contrats valides + date_fin_prevue dépassée + ligne non retournée -->
               <li>
                 Contrat #{{ al.id_contrat }} (retour prévu {{ al.date_fin_prevue }}) —
                 {{ al.client_prenom }} {{ al.client_nom }} —
                 Article #{{ al.id_article }} ({{ al.marque }} {{ al.modele }} / {{ al.numero_serie }})
               </li>
             {% else %}
-              <li>Aucune alerte.</li>
+              <li>Aucune alerte.</li>  <!-- fallback si aucune location en retard -->
             {% endfor %}
           </ul>
         </div>

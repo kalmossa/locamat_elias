@@ -7,6 +7,8 @@
 </head>
 <body>
   <div class="container">
+
+    <!-- en-tête + navigation -->
     <header class="topbar">
       <h1>{{ title }}</h1>
       <nav class="nav">
@@ -16,32 +18,45 @@
       </nav>
     </header>
 
+    <!-- formulaire de retour -->
     <section class="card">
+
+      <!-- message d’erreur éventuel -->
       {% if error %}
         <div class="error">{{ error }}</div>
         <div style="height:10px"></div>
       {% endif %}
 
       <form method="post" class="form">
+
+        <!-- sélection de la ligne de contrat à retourner -->
         <label>Ligne à retourner</label>
         <select name="id_ligne" required>
           <option value="" disabled selected>— Choisir une location en cours —</option>
           {% for r in retours %}
             <option value="{{ r.id_ligne }}">
-              Ligne #{{ r.id_ligne }} — Article #{{ r.id_article }} ({{ r.marque }} {{ r.modele }}) — retour prévu {{ r.date_fin_prevue or "—" }}
+              Ligne #{{ r.id_ligne }} —
+              Article #{{ r.id_article }} ({{ r.marque }} {{ r.modele }}) —
+              retour prévu {{ r.date_fin_prevue or "—" }}
             </option>
           {% endfor %}
         </select>
 
+        <!-- date de retour réelle -->
         <label>Date de retour effective
           <input name="date_retour_effective" type="date" required>
         </label>
 
+        <!-- validation -->
         <div class="actions">
-          <button class="btn primary" type="submit">Enregistrer le retour</button>
+          <button class="btn primary" type="submit">
+            Enregistrer le retour
+          </button>
         </div>
+
       </form>
     </section>
+
   </div>
 </body>
 </html>

@@ -7,8 +7,7 @@ from src.dal.retours_dal import RetoursDAL
 
 
 class LocamatService:
-    """Logique métier centrale"""
-    
+    # couche bll qui centralise logique métier et appelle les appels DAL
     def __init__(self):
         self.articles_dal = ArticlesDAL()
         self.clients_dal = ClientsDAL()
@@ -16,8 +15,7 @@ class LocamatService:
         self.dashboard_dal = DashboardDAL()
         self.retours_dal = RetoursDAL()
 
-    # === CLIENTS ===
-    
+    # clients
     def lister_clients(self):
         return self.clients_dal.get_all()
 
@@ -33,8 +31,7 @@ class LocamatService:
 
         return {"id_client": result, "nom": nom, "prenom": prenom, "est_vip": est_vip}
 
-    # === ARTICLES ===
-    
+    # articles
     def lister_articles_disponibles(self):
         return self.articles_dal.get_disponibles()
 
@@ -66,16 +63,14 @@ class LocamatService:
             raise RuntimeError(msg)
         return msg
 
-    # === DASHBOARD ===
-    
+    # dashbord
     def dashboard(self):
         top5 = self.dashboard_dal.top5_rentables_mois()
         ca30 = self.dashboard_dal.ca_30_derniers_jours()
         alertes = self.dashboard_dal.alertes_retards()
         return {"top5": top5, "ca_30j": ca30, "alertes_retards": alertes}
 
-    # === RETOURS ===
-    
+    # retours
     def lister_retours_possibles(self):
         return self.retours_dal.get_non_retournes()
 
@@ -88,8 +83,7 @@ class LocamatService:
             raise RuntimeError(result)
         return result
 
-    # === CONTRATS / LOCATION ===
-    
+    # contrats et locs
     def valider_contrat(self, id_client, date_debut, date_fin_prevue, article_ids):
         # check basique
         if id_client <= 0:
@@ -152,7 +146,7 @@ class LocamatService:
         prix_base = round(prix_base, 2)
         prix_final = round(prix_final, 2)
 
-        # transaction
+        # transaction sql atyomique
         ok, result = self.contrats_dal.valider_contrat_transaction(
             id_client, date_debut, date_fin_prevue, article_ids, prix_final, lignes
         )

@@ -1,19 +1,16 @@
 from datetime import date
 from src.database_config import get_connection, log_critical_error
-
-
-class RetoursDAL:
+class RetoursDAL: # couche DAL pour la gestion des retours (SQL + transaction)
     
-    def enregistrer_retour(self, id_ligne, date_retour, etat_retour="Retourne"):
+    def enregistrer_retour(self, id_ligne, date_retour, etat_retour="Retourne"):    # Enregistrer retour (transaction) - maj ligne + article + contrat si cloture
         conn = get_connection()
         if not conn:
             return False, "Connexion DB impossible"
 
-        try:
+        try: # transaction manuelle (commit/rollback)
             conn.autocommit = False
 
-            with conn.cursor() as cur:
-                # lock ligne + récup infos
+            with conn.cursor() as cur:       # lock ligne + récup infos
                 cur.execute("""
                     SELECT lc.id_article, lc.id_contrat, lc.etat_retour, c.statut
                     FROM lignes_contrat lc
@@ -27,7 +24,7 @@ class RetoursDAL:
 
                 id_article, id_contrat, etat_actuel, statut_contrat = row
 
-                # check contrat valide
+                # check contrat valide  ; on refuse un retour si le contrat n'est pas en statut valide
                 if statut_contrat != 'Valide':
                     conn.rollback()
                     return False, f"Contrat pas valide (statut={statut_contrat})."
@@ -37,7 +34,7 @@ class RetoursDAL:
                     conn.rollback()
                     return False, f"Déjà traité (etat={etat_actuel})."
 
-                # maj ligne
+                # maj ligne contrats 
                 cur.execute("""
                     UPDATE lignes_contrat
                     SET date_retour_effective = %s, etat_retour = %s
@@ -58,7 +55,7 @@ class RetoursDAL:
 
                 statut_article = row_statut[0]
 
-                # si pas en maintenance/rebut, remettre dispo
+                # si pas en maintenance/rebut, remettre dispo en stock
                 if statut_article not in ("EnMaintenance", "Rebut"):
                     cur.execute("UPDATE articles SET statut = 'Disponible' WHERE id_article = %s;",
                               (id_article,))
@@ -83,21 +80,20 @@ class RetoursDAL:
                 "date_retour_effective": date_retour.isoformat(),
                 "etat_retour": etat_retour,
             }
-        except Exception as e:
+        except Exception as e:         
             conn.rollback()
             log_critical_error("retours enregistrer", e)
-            return False, "Erreur technique."
+            return False, "Erreur technique." 
         finally:
             conn.close()
 
-    def get_non_retournes(self):
-        """Liste lignes pas encore retournées"""
+    def get_non_retournes(self): # liste des lignes actives (non retournées) uniquement sur contrats valides
         conn = get_connection()
         if not conn:
             return []
 
         try:
-            with conn.cursor() as cur:
+            with conn.cursor() as cur: # large jointure pour infos article + contrat  et DISTINCT évite doublons si jointures et données historiques
                 cur.execute("""
                     SELECT DISTINCT lc.id_ligne, lc.id_contrat, a.id_article,
                            m.libelle, a.modele, a.numero_serie, c.date_fin_prevue
@@ -110,7 +106,7 @@ class RetoursDAL:
                 """)
                 rows = cur.fetchall()
 
-            return [{
+            return [{  # mapping SQL -> dict python
                 "id_ligne": r[0], "id_contrat": r[1], "id_article": r[2],
                 "marque": r[3], "modele": r[4], "numero_serie": r[5],
                 "date_fin_prevue": r[6].isoformat() if r[6] else None,

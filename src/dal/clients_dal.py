@@ -1,9 +1,7 @@
 from src.database_config import get_connection, log_critical_error
-
-
-class ClientsDAL:
+class ClientsDAL: # Gestion des clients
     
-    def get_by_id(self, id_client):
+    def get_by_id(self, id_client):  # Récup client par id
         conn = get_connection()
         if not conn:
             return None
@@ -20,15 +18,15 @@ class ClientsDAL:
                     "id_client": row[0], "nom": row[1], "prenom": row[2],
                     "est_vip": row[3], "a_eu_retard_derniere_location": row[4],
                 }
-        except Exception as e:
-            log_critical_error("clients get_by_id", e)
-            return None
+        except Exception as e:  
+            log_critical_error("clients get_by_id", e) 
+            return None 
         finally:
             conn.close()
 
-    def get_all(self):
-        conn = get_connection()
-        if not conn:
+    def get_all(self):  
+        conn = get_connection() 
+        if not conn: 
             return []
 
         try:
@@ -49,7 +47,7 @@ class ClientsDAL:
         finally:
             conn.close()
 
-    def create_client(self, nom, prenom, est_vip=False):
+    def create_client(self, nom, prenom, est_vip=False): # 
         conn = get_connection()
         if not conn:
             return False, "Connexion DB impossible"

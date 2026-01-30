@@ -2,11 +2,11 @@ from psycopg2 import errors
 from src.database_config import get_connection, log_critical_error
 
 
-class ArticlesDAL:
-    STATUTS = {"Disponible", "Loue", "EnMaintenance", "Rebut"}
+class ArticlesDAL:  # couche d'accès aux données pour les articles et logique SQL liée au parc
+    STATUTS = {"Disponible", "Loue", "EnMaintenance", "Rebut"} 
 
     def get_all_with_location(self):
-        """Tous les articles + loc en cours si existe"""
+        # Retourne tous les articles et si location en cours on récupère la date de fin prévue ;
         conn = get_connection()
         if not conn:
             return []
@@ -42,14 +42,13 @@ class ArticlesDAL:
         finally:
             conn.close()
 
-    def get_disponibles(self):
-        """Articles dispo seulement"""
+    def get_disponibles(self):         # Articles dispo seulement
         conn = get_connection()
         if not conn:
             return []
 
         try:
-            with conn.cursor() as cur:
+            with conn.cursor() as cur:  # lock articles
                 cur.execute("""
                     SELECT a.id_article, c.libelle, m.libelle, a.modele,
                            a.numero_serie, a.prix_journalier_actuel
@@ -72,8 +71,7 @@ class ArticlesDAL:
         finally:
             conn.close()
 
-    def get_by_ids(self, article_ids):
-        """Récup articles par liste d'ids"""
+    def get_by_ids(self, article_ids): # Récup articles par liste d'ids
         if not article_ids:
             return []
 
@@ -82,7 +80,7 @@ class ArticlesDAL:
             return []
 
         try:
-            with conn.cursor() as cur:
+            with conn.cursor() as cur:  # lock articles
                 cur.execute("""
                     SELECT id_article, prix_journalier_actuel
                     FROM articles
@@ -98,8 +96,7 @@ class ArticlesDAL:
         finally:
             conn.close()
 
-    def delete_if_possible(self, id_article):
-        """Delete article si pas lié à contrat"""
+    def delete_if_possible(self, id_article): # Supprime article si pas lié à contrat
         conn = get_connection()
         if not conn:
             return False, "Connexion DB impossible"
@@ -123,8 +120,7 @@ class ArticlesDAL:
         finally:
             conn.close()
 
-    def update_statut(self, id_article, new_statut):
-        """Change statut article"""
+    def update_statut(self, id_article, new_statut): # Met à jour le statut d'un article
         if new_statut not in self.STATUTS:
             return False, "Statut invalide."
 
@@ -136,7 +132,7 @@ class ArticlesDAL:
             conn.autocommit = False
             with conn.cursor() as cur:
                 # lock article
-                cur.execute("SELECT statut FROM articles WHERE id_article = %s FOR UPDATE;", (id_article,))
+                cur.execute("SELECT statut FROM articles WHERE id_article = %s FOR UPDATE;", (id_article,))  # lock
                 row = cur.fetchone()
                 if not row:
                     conn.rollback()
@@ -152,7 +148,7 @@ class ArticlesDAL:
                     conn.rollback()
                     return False, "Impossible : article loué."
 
-                # maj
+                # update statut
                 cur.execute("UPDATE articles SET statut = %s WHERE id_article = %s;",
                           (new_statut, id_article))
 
@@ -165,8 +161,7 @@ class ArticlesDAL:
         finally:
             conn.close()
 
-    def stock_resume(self):
-        """Count par statut"""
+    def stock_resume(self):      # Résumé du stock par statut
         conn = get_connection()
         if not conn:
             return {"Disponible": 0, "Loue": 0, "EnMaintenance": 0, "Rebut": 0}
@@ -181,7 +176,7 @@ class ArticlesDAL:
                 if statut in stock:
                     stock[statut] = int(cnt)
             return stock
-        except Exception as e:
+        except Exception as e: # Erreur 
             log_critical_error("articles stock_resume", e)
             return {"Disponible": 0, "Loue": 0, "EnMaintenance": 0, "Rebut": 0}
         finally:

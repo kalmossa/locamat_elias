@@ -1,4 +1,4 @@
-:root{
+:root{  /* définitions des variables CSS  */
   --bg1:#f6f7fb;
   --bg2:#eef1f7;
   --card:#ffffff;
@@ -10,22 +10,22 @@
   --shadow: 0 1px 10px rgba(17,24,39,.05);
 }
 
-*{ box-sizing:border-box; }
+*{ box-sizing:border-box; } /* bordures dans dimensions */
 
-body{
+body{  /* styles globaux */
   margin:0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color:var(--text);
   background: linear-gradient(180deg, var(--bg1), var(--bg2));
 }
 
-.container{
+.container{ /* conteneur principal */
   max-width: 1100px;
   margin: 0 auto;
   padding: 28px 18px;
 }
 
-.topbar{
+.topbar{ 
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -33,26 +33,26 @@ body{
   margin-bottom: 16px;
 }
 
-h1{ margin:0; font-size: 22px; letter-spacing:.2px; }
+h1{ margin:0; font-size: 22px; letter-spacing:.2px; }  /* titres */
 h2,h3{ margin: 0 0 12px; }
 
-.nav{
+.nav{  
   display:flex;
   gap:10px;
   flex-wrap:wrap;
 }
 
-.card{
+.card{  /* cartes */  
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 18px;
+  padding: 18px; 
   box-shadow: var(--shadow);
 }
 
-.grid{ display:grid; gap:14px; }
+.grid{ display:grid; gap:14px; }  
 
-.kpi{
+.kpi{ /* indicateurs */
   border:1px solid var(--border);
   border-radius:12px;
   padding:14px;
@@ -62,7 +62,7 @@ h2,h3{ margin: 0 0 12px; }
 .kpi-value{ font-size: 20px; font-weight: 700; }
 .muted{ color: var(--muted); font-size: 13px; margin-top:6px; }
 
-.btn{
+.btn{  /* boutons */
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -76,9 +76,9 @@ h2,h3{ margin: 0 0 12px; }
   box-shadow: 0 1px 2px rgba(0,0,0,.06);
   font-size: 14px;
 }
-.btn:hover{ border-color:#cbd5e1; }
+.btn:hover{ border-color:#cbd5e1; }  /* effet  */
 
-.btn.primary{
+.btn.primary{ 
   background: var(--primary);
   border-color: var(--primary);
   color:#fff;
@@ -90,20 +90,20 @@ h2,h3{ margin: 0 0 12px; }
   color: var(--danger);
 }
 
-.table{
+.table{  /* tableaux */
   width:100%;
   border-collapse: collapse;
   font-size: 14px;
 }
 
-.table th, .table td{
+.table th, .table td{ /* cellules */
   border-top:1px solid var(--border);
   padding:10px 8px;
   text-align:left;
   vertical-align: middle;
 }
 
-.table th{
+.table th{  /* en-têtes */
   color:var(--muted);
   font-weight:600;
   font-size:12px;
@@ -111,7 +111,7 @@ h2,h3{ margin: 0 0 12px; }
   letter-spacing:.3px;
 }
 
-.badge{
+.badge{  /* étiquettes */
   display:inline-block;
   padding:4px 8px;
   border-radius:999px;
@@ -123,20 +123,20 @@ h2,h3{ margin: 0 0 12px; }
 .badge.dispo{ border-color:#bbf7d0; background:#f0fdf4; }
 .badge.loue{ border-color:#fed7aa; background:#fff7ed; }
 
-.form{
+.form{    /* formulaires */
   display:grid;
   gap: 12px;
   max-width: 520px;
 }
 
-.form label{
+.form label{    /* étiquettes */
   display:block;
   color:var(--muted);
   font-size:13px;
   margin-top: 10px;
 }
 
-.form input, .form select{
+.form input, .form select{    /* champs */
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -146,12 +146,12 @@ h2,h3{ margin: 0 0 12px; }
   outline:none;
 }
 
-.form input:focus, .form select:focus{
+.form input:focus, .form select:focus{    /* focus champs */
   border-color: #93c5fd;
   box-shadow: 0 0 0 3px rgba(37,99,235,.12);
 }
 
-.pre{
+.pre{   /* blocs de code */
   background:#0b1020;
   color:#e5e7eb;
   padding:14px;

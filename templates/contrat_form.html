@@ -2,11 +2,18 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+
+  <!-- titre dynamique envoyé par Flask -->
   <title>{{ title }}</title>
+
+  <!-- css commun -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+
 <body>
   <div class="container">
+
+    <!-- topbar : navigation rapide -->
     <header class="topbar">
       <h1>{{ title }}</h1>
       <nav class="nav">
@@ -16,23 +23,33 @@
     </header>
 
     <section class="card">
+
+      <!-- affichage d'une erreur serveur (validation, incohérence, etc.) -->
       {% if error %}
         <div class="error">{{ error }}</div>
         <div style="height:10px"></div>
       {% endif %}
 
+      <!-- formulaire de création/validation d’un contrat -->
       <form method="post" class="form">
+
+        <!-- sélection client existant ou création rapide -->
         <label>Client</label>
         <select name="id_client" id="id_client" required>
           <option value="" disabled selected>— Choisir un client —</option>
+
+          <!-- clients existants -->
           {% for c in clients %}
             <option value="{{ c.id_client }}">
               #{{ c.id_client }} — {{ c.prenom }} {{ c.nom }}{% if c.est_vip %} (VIP){% endif %}
             </option>
           {% endfor %}
+
+          <!-- option spéciale traitée côté serveur : création client -->
           <option value="__NEW__">➕ Nouveau client</option>
         </select>
 
+        <!-- champs affichés uniquement si __NEW__ est choisi -->
         <div id="new_client_fields" style="display:none; margin-top:10px;">
           <label>Nom
             <input name="new_nom" type="text" placeholder="Nom">
@@ -48,6 +65,7 @@
           </label>
         </div>
 
+        <!-- période du contrat -->
         <label>Date début
           <input name="date_debut" type="date" required>
         </label>
@@ -56,6 +74,7 @@
           <input name="date_fin_prevue" type="date" required>
         </label>
 
+        <!-- sélection du panier : uniquement les articles disponibles (règle métier + filtre DAL) -->
         <div style="margin-top:10px;">
           <strong>Articles disponibles</strong>
           <div class="muted" style="margin-top:6px;">Coche un ou plusieurs articles.</div>
@@ -64,6 +83,8 @@
             <p>Aucun article disponible.</p>
           {% else %}
             <div style="margin-top:8px; display:grid; gap:8px;">
+
+              <!-- checkboxes multi-sélection : name=article_ids => request.form.getlist("article_ids") côté Flask -->
               {% for a in articles_dispo %}
                 <label style="display:flex; gap:10px; align-items:center;">
                   <input type="checkbox" name="article_ids" value="{{ a.id_article }}">
@@ -72,6 +93,7 @@
                   </span>
                 </label>
               {% endfor %}
+
             </div>
           {% endif %}
         </div>
@@ -84,13 +106,15 @@
   </div>
 
   <script>
+    // ui : affichage dynamique des champs "nouveau client"
     const sel = document.getElementById("id_client");
     const box = document.getElementById("new_client_fields");
 
     function toggleNew() {
       const isNew = sel.value === "__NEW__";
       box.style.display = isNew ? "block" : "none";
-      // on rend required seulement si nouveau
+
+      // on active required uniquement si l'utilisateur crée un client
       const nom = document.querySelector('input[name="new_nom"]');
       const prenom = document.querySelector('input[name="new_prenom"]');
       if (nom && prenom) {
@@ -98,7 +122,11 @@
         prenom.required = isNew;
       }
     }
+
+    // déclenche quand on change le client
     sel.addEventListener("change", toggleNew);
+
+    // init au chargement (utile en cas de refresh ou d'erreur serveur)
     toggleNew();
   </script>
 </body>

@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS marques CASCADE;
 DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS clients CASCADE;
 
--- 1) TABLES DE REf
+-- 1) TABLES 2 ref
 
 CREATE TABLE clients (
     id_client SERIAL PRIMARY KEY,
@@ -14,8 +14,8 @@ CREATE TABLE clients (
     prenom VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE,
     telephone VARCHAR(30),
-    est_vip BOOLEAN NOT NULL DEFAULT FALSE,
-    a_eu_retard_derniere_location BOOLEAN NOT NULL DEFAULT FALSE
+    est_vip BOOLEAN NOT NULL DEFAULT FALSE,  -- metier
+    a_eu_retard_derniere_location BOOLEAN NOT NULL DEFAULT FALSE -- metier
 );
 
 CREATE TABLE categories (
@@ -29,8 +29,7 @@ CREATE TABLE marques (
 );
 
 
--- 2) PARC MATERIEL
-
+-- 2) parc
 
 CREATE TABLE articles (
     id_article SERIAL PRIMARY KEY,
@@ -41,8 +40,8 @@ CREATE TABLE articles (
     numero_serie VARCHAR(120) NOT NULL UNIQUE,
     date_achat DATE,
 
-    statut VARCHAR(20) NOT NULL DEFAULT 'Disponible',
-    prix_journalier_actuel NUMERIC(10,2) NOT NULL DEFAULT 0,
+    statut VARCHAR(20) NOT NULL DEFAULT 'Disponible',   -- statut métier
+    prix_journalier_actuel NUMERIC(10,2) NOT NULL DEFAULT 0,     -- prix locs
 
     CONSTRAINT fk_articles_categorie
         FOREIGN KEY (id_categorie) REFERENCES categories(id_categorie)
@@ -54,14 +53,14 @@ CREATE TABLE articles (
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    CONSTRAINT ck_articles_statut
+    CONSTRAINT ck_articles_statut     -- contraintes métier
         CHECK (statut IN ('Disponible','Loue','EnMaintenance','Rebut')),
 
     CONSTRAINT ck_articles_prix_non_negatif
         CHECK (prix_journalier_actuel >= 0)
 );
 
--- 3) CONTRATS + LIGNES
+-- 3) contrats + lignes
 
 CREATE TABLE contrats_location (
     id_contrat SERIAL PRIMARY KEY,
@@ -84,7 +83,7 @@ CREATE TABLE contrats_location (
         CHECK (date_fin_prevue >= date_debut),
 
     CONSTRAINT ck_contrat_statut
-        CHECK (statut IN ('Brouillon','Valide','Cloture','Annule')),
+        CHECK (statut IN ('Brouillon','Valide','Cloture','Annule')),    -- contraintes métier
 
     CONSTRAINT ck_contrat_prix_non_negatif
         CHECK (prix_final >= 0)
@@ -104,7 +103,7 @@ CREATE TABLE lignes_contrat (
 
     prix_total_ligne NUMERIC(12,2) NOT NULL,
 
-    -- retour ici 
+    -- gestion du retour
     etat_retour VARCHAR(20) NOT NULL DEFAULT 'NonRetourne',
     date_retour_effective DATE,
 
@@ -118,7 +117,7 @@ CREATE TABLE lignes_contrat (
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    CONSTRAINT uq_ligne_unique_article_par_contrat
+    CONSTRAINT uq_ligne_unique_article_par_contrat --  article unique...
         UNIQUE (id_contrat, id_article),
 
     CONSTRAINT ck_ligne_nombre_jours
@@ -133,7 +132,7 @@ CREATE TABLE lignes_contrat (
     CONSTRAINT ck_lignes_etat_retour
         CHECK (etat_retour IN ('NonRetourne','Retourne'))
 );
--- 4) RETOURS (optionnel: historique séparé)
+-- 4) RETOURS optionnel et séparé
 
 CREATE TABLE retours (
     id_retour SERIAL PRIMARY KEY,
